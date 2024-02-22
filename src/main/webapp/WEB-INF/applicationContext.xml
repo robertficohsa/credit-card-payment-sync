@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:task="http://www.springframework.org/schema/task" 
+       xmlns:jee="http://www.springframework.org/schema/jee" 
+       xmlns:tx="http://www.springframework.org/schema/tx" 
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+                           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd
+                           http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd
+                           http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee.xsd
+                           http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd">
+    <context:component-scan base-package="com.ficohsa.credit.card.payment.sync" />
+    <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        <property name="locations">
+            <list>
+                <value>classpath:/CreditCardPaymentSync/credit-card-payment-sync.properties</value>
+                <value>classpath:/com/ficohsa/credit/card/payment/sync/dao/messages/CreditCardPaymentSyncDAO.properties</value>
+            </list>
+        </property>
+    </bean>
+    <jee:jndi-lookup id="dbDataSource" jndi-name="jdbc/ConnectionPagosWSTC" expected-type="javax.sql.DataSource"/>
+    <tx:annotation-driven proxy-target-class="true" transaction-manager="transactionManager"/>
+    <bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+        <property name="dataSource" ref="dbDataSource"/>
+    </bean>
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dbDataSource" />
+    </bean>
+    <bean id="marshaller" class="org.springframework.oxm.jaxb.Jaxb2Marshaller">
+        <property name="contextPath" value="com.ficohsa.credit.card.payment.sync.middleware.client.entity"/>
+    </bean>
+    <bean id="webServiceTemplate" class="org.springframework.ws.client.core.WebServiceTemplate">
+        <property name="marshaller" ref="marshaller"/>
+        <property name="unmarshaller" ref="marshaller"/>
+        <property name="defaultUri" value="${middleware.visionplus.ws.endpoint}"/>
+    </bean>
+    <task:annotation-driven executor="creditCardPaymentsExecutor" scheduler="creditCardPaymentsTaskHN" />
+    <task:scheduled-tasks scheduler="creditCardPaymentsTask">
+        <task:scheduled  ref="syncTask" method="runPA" cron="${task.cron}" />
+        <task:scheduled  ref="syncTask" method="runGT" cron="${task.cron}"/>
+    </task:scheduled-tasks>
+    <task:scheduled-tasks scheduler="creditCardPaymentsTaskHN">
+        <task:scheduled  ref="syncTaskHN" method="runHN" fixed-rate="${taskHN.fixedRate}"/>
+    </task:scheduled-tasks>
+    <task:scheduler id="creditCardPaymentsTask"  pool-size="${task.poolSize}"/>
+    <task:scheduler id="creditCardPaymentsTaskHN"  pool-size="${taskHN.poolSize}"/>
+    <task:executor id="creditCardPaymentsExecutor" pool-size="${executorHN.poolSize}"/>
+</beans>
